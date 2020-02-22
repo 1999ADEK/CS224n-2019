@@ -30,7 +30,7 @@ class CharDecoder(nn.Module):
         super(CharDecoder, self).__init__()
         self.charDecoder = nn.LSTM(char_embedding_size, hidden_size)
         self.char_output_projection = nn.Linear(hidden_size, len(target_vocab.char2id))
-        self.decoderCharEmb = nn.Embedding(len(target_vocab.char2id), char_embedding_size, padding_idx=target_vocab.char2id['<unk>'])
+        self.decoderCharEmb = nn.Embedding(len(target_vocab.char2id), char_embedding_size, padding_idx=target_vocab.char2id['<pad>'])
         self.target_vocab = target_vocab
         ### END YOUR CODE
 
@@ -68,8 +68,8 @@ class CharDecoder(nn.Module):
         ### Hint: - Make sure padding characters do not contribute to the cross-entropy loss.
         ###       - char_sequence corresponds to the sequence x_1 ... x_{n+1} from the handout (e.g., <START>,m,u,s,i,c,<END>).
         cross_entropy = nn.CrossEntropyLoss(ignore_index=self.target_vocab.char2id['<pad>'], reduction='sum')
-        scores, dec_hidden = self.forward(char_sequence, dec_hidden)
-        return cross_entropy(scores.reshape(-1, scores.size(-1)), char_sequence.reshape(-1))
+        scores, dec_hidden = self.forward(char_sequence[:-1], dec_hidden)
+        return cross_entropy(scores.reshape(-1, scores.size(-1)), char_sequence[1:].reshape(-1))
         ### END YOUR CODE
 
     def decode_greedy(self, initialStates, device, max_length=21):
@@ -99,8 +99,9 @@ class CharDecoder(nn.Module):
             probs = nn.functional.softmax(scores, dim=-1)
             current_char = probs.argmax(dim=-1)
             for i in range(batch_size):
-                char_to_add = self.target_vocab.id2char[current_char[0][i].item()]
-                if char_to_add ==  self.target_vocab.end_of_word and t < output_word_length[i]:
+                char_idx = current_char[0][i].item()
+                char_to_add = self.target_vocab.id2char[char_idx]
+                if char_idx ==  self.target_vocab.end_of_word and t < output_word_length[i]:
                     output_word_length[i] = t
                 output_word[i] += char_to_add
         return [output_word[i][:output_word_length[i]] for i in range(batch_size)]
